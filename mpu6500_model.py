@@ -1,6 +1,5 @@
-import smbus
+import smbus2
 import time
-import math
 
 mpu6500_addr = 0x68 #run i2cdetect -y 1 to find the address of the imu
 
@@ -17,7 +16,11 @@ gyroout_x = 0x43
 gyroout_y = 0x45
 gyroout_z = 0x47	#addresses of the imu output
 
-bus = smbus.SMBus(1) #initializes the i2c bus
+alpha = 0.8
+prev_ax, prev_ay, prev_az = 0, 0, 0
+prev_gx, prev_gy, prev_gz = 0, 0, 0
+
+bus = smbus2.SMBus(1) #initializes the i2c bus
 
 def mpu6500_init():
     bus.write_byte_data(mpu6500_addr, pwr_mgmt, 0) #starts in sleep mode, setting pwr_mgmt to 0 awakens it
@@ -40,20 +43,21 @@ def read_data(addr):
     return value
 
 def read_mpu6500():
-    ax = read_data(accelout_x)/16384.0
-    ay = read_data(accelout_y)/16384.0
-    az = read_data(accelout_z)/16384.0
     
-    gx = read_data(gyroout_x)/131.0
-    gy = read_data(gyroout_y)/131.0
-    gz = read_data(gyroout_z)/131.0
+    global prev_gx, prev_gy, prev_gz, prev_ax, prev_ay, prev_az
+    
+    ax = alpha * prev_ax + (1 - alpha) * read_data(accelout_x)/16384.0
+    ay = alpha * prev_ay + (1 - alpha) * read_data(accelout_y)/16384.0
+    az = alpha * prev_az + (1 - alpha) * read_data(accelout_z)/16384.0
+    
+    gx = alpha * prev_gx + (1 - alpha) * read_data(gyroout_x)/131.0
+    gy = alpha * prev_gy + (1 - alpha) * read_data(gyroout_y)/131.0
+    gz = alpha * prev_gz + (1 - alpha) * read_data(gyroout_z)/131.0
+    
+    prev_ax, prev_ay, prev_az = ax, ay, az
+    prev_gx, prev_gy, prev_gz = gx, gy, gz
     
     print(f"accel x: {ax}, y: {ay}, z: {az}")
     print(f"gyro x: {gx}, y: {gy}, z: {gz}")
     
-    print("==========================================================================")
     return ax, ay, az, gx, gy, gz
-
-while True:
-    read_mpu6500()
-    time.sleep(0.25)
